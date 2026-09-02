@@ -256,6 +256,100 @@ function groupByVideo(urls) {
   );
 }
 
+/** format_id → 清晰度标签（101xx 系列为同清晰度的省流编码变体） */
+const QUALITY_LABEL_BY_FORMAT = {
+  10002: '超清',
+  10102: '超清',
+  10003: '高清',
+  10103: '高清',
+  10004: '流畅',
+  10104: '流畅',
+  20003: '自动',
+};
+
+/** 从 URL 文件名推断清晰度标签（无元数据时的兜底） */
+function labelForUrl(url) {
+  const m = url.match(/\.(f(\d{5}))\.mp4/);
+  if (!m) return '标清';
+  return QUALITY_LABEL_BY_FORMAT[Number(m[2])] || '标清';
+}
+
+function baseOf(url) {
+  return url.replace(/\.f\d{5}\.mp4.*$/, '');
+}
+
+/**
+ * 解析文章 HTML 中的 mp_video_trans_info 数组（每个视频的完整清晰度清单 + 元数据）。
+ * 兼容两种形态：url: 'http://...'（原始数据）与 url: ('http://...').replace(...)（JS 包装）。
+ * 返回 [{url, formatId, width, height, filesize, durationMs, label}]，按 url 去重。
+ */
+function extractTransInfo(html) {
+  const out = [];
+  const seen = new Set();
+  const re = /mp_video_trans_info\s*:\s*\[/g;
+  let m;
+  while ((m = re.exec(html))) {
+    let pos = m.index + m[0].length;
+    while (pos < html.length) {
+      const open = html.indexOf('{', pos);
+      if (open === -1) break;
+      const close = html.indexOf('}', open);
+      if (close === -1) break;
+      const item = html.slice(open, close + 1);
+      // 数组外的后续字段没有 format_id，遇之即停
+      if (!item.includes('format_id')) break;
+      const g = (re2) => (item.match(re2) || [])[1] || '';
+      const rawUrl = g(/url:\s*(?:\(\s*)?'([^']+)'/);
+      pos = close + 1;
+      if (!rawUrl) continue;
+      const url = decodeEntities(rawUrl).replace(/^http:\/\//i, 'https://');
+      if (!url.includes('mpvideo.qpic.cn') || seen.has(url)) continue;
+      seen.add(url);
+      const formatId = Number(g(/format_id:\s*'(\d+)'/) || 0);
+      out.push({
+        url,
+        formatId,
+        width: Number(g(/width:\s*'(\d+)'/) || 0),
+        height: Number(g(/height:\s*'(\d+)'/) || 0),
+        filesize: Number(g(/filesize:\s*'(\d+)'/) || 0),
+        durationMs: Number(g(/duration_ms:\s*'(\d+)'/) || 0),
+        label: g(/video_quality_wording:\s*'([^']*)'/) || QUALITY_LABEL_BY_FORMAT[formatId] || '标清',
+      });
+    }
+  }
+  return out;
+}
+
+/** 按视频分组 trans_info 条目，组内排序：清晰度优先、同档位大文件（标准编码）优先 */
+function groupTransInfo(items) {
+  const groups = new Map();
+  for (const t of items) {
+    const base = baseOf(t.url);
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base).push(t);
+  }
+  return [...groups.values()].map((list) =>
+    list.sort((a, b) => qualityRank(b.url) - qualityRank(a.url) || b.filesize - a.filesize)
+  );
+}
+
+/** 一组 trans_info 条目 → 前端 sources 结构 */
+function toSources(items) {
+  return items.map((t) => ({
+    url: t.url,
+    label: t.label,
+    width: t.width,
+    height: t.height,
+    filesize: t.filesize,
+    durationMs: t.durationMs,
+  }));
+}
+
+/** 一组裸 URL → sources（无元数据兜底，标签从文件名推断） */
+function urlsToSources(urls) {
+  return urls.map((u) => ({ url: u, label: labelForUrl(u), width: 0, height: 0, filesize: 0, durationMs: 0 }));
+}
+
 /** 递归收集 JSON 对象里所有含 mpvideo.qpic.cn 的字符串字段 */
 function collectMpvideoUrls(obj, out = []) {
   if (typeof obj === 'string') {
@@ -373,8 +467,14 @@ export async function parseArticle(rawUrl) {
 
   const candidates = dedupeCandidates(extractCandidates(html));
   const wechatCandidates = candidates.filter((c) => classify(c) === 'wechat').slice(0, MAX_CANDIDATES);
-  // 文章 HTML 内的直链（含 mp_video_trans_info 中的带 auth 播放地址）按视频分组、组内取最佳清晰度
-  const articleDirectGroups = groupByVideo(extractMpvideoUrls(html));
+
+  // 文章 HTML 内嵌 mp_video_trans_info：每个视频的完整清晰度清单 + 元数据
+  const transGroups = groupTransInfo(extractTransInfo(html));
+  const transBases = new Set(transGroups.map((g) => baseOf(g[0].url)));
+  // 其余直链（老结构等，无元数据）：排除已覆盖的基路径，避免冷链接重复成组
+  const extraGroups = groupByVideo(
+    extractMpvideoUrls(html).filter((u) => !transBases.has(baseOf(u)))
+  ).map((urls) => urlsToSources(urls));
 
   const unsupported = [];
   const seenKinds = new Set();
@@ -392,24 +492,25 @@ export async function parseArticle(rawUrl) {
   const videos = [];
   const pairedVids = new Set();
 
-  // 情况一：文章 HTML 中直接出现 mpvideo 直链（每组 = 一个视频）
-  if (articleDirectGroups.length) {
+  // 情况一：文章 HTML 中直接出现直链/清晰度清单（每组 = 一个视频）
+  const itemGroups = [...transGroups, ...extraGroups];
+  if (itemGroups.length) {
     if (!wechatCandidates.length) {
-      // 没有 iframe 承载，直链分组单独成条
-      for (const g of articleDirectGroups.slice(0, MAX_VIDEOS_PER_ARTICLE)) {
-        videos.push({ vid: '', cover, url: g[0] });
+      // 没有 iframe 承载，分组单独成条
+      for (const g of itemGroups.slice(0, MAX_VIDEOS_PER_ARTICLE)) {
+        videos.push({ vid: '', cover, url: g[0].url, sources: g });
       }
     } else {
       // 按顺序与候选配对（数量不齐时，多出的候选走播放器页兜底，多出的分组单独成条）
       wechatCandidates.forEach((c, i) => {
-        const g = articleDirectGroups[i];
+        const g = itemGroups[i];
         if (!g?.length) return;
         pairedVids.add(c.vid || c.src);
-        videos.push({ vid: c.vid, cover: toHttps(c.cover) || cover, url: g[0] });
+        videos.push({ vid: c.vid, cover: toHttps(c.cover) || cover, url: g[0].url, sources: g });
       });
-      for (const g of articleDirectGroups.slice(wechatCandidates.length)) {
+      for (const g of itemGroups.slice(wechatCandidates.length)) {
         if (videos.length >= MAX_VIDEOS_PER_ARTICLE) break;
-        videos.push({ vid: '', cover, url: g[0] });
+        videos.push({ vid: '', cover, url: g[0].url, sources: g });
       }
     }
   }
@@ -421,7 +522,8 @@ export async function parseArticle(rawUrl) {
     if (s.status !== 'fulfilled' || !s.value?.urls?.length) return;
     if (videos.length >= MAX_VIDEOS_PER_ARTICLE) return;
     const c = pending[i];
-    videos.push({ vid: c.vid, cover: toHttps(c.cover) || cover, url: s.value.urls[0] });
+    const sources = urlsToSources(s.value.urls);
+    videos.push({ vid: c.vid, cover: toHttps(c.cover) || cover, url: sources[0].url, sources });
   });
 
   return { ok: true, title, cover, videos: dedupeVideos(videos), unsupported };

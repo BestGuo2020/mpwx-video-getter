@@ -12,11 +12,28 @@ const t = (key, params) => i18n.t(key, params);
 
 const playing = ref(false);
 const copied = ref(false);
+const selectedIdx = ref(0);
+
+// 清晰度清单：后端按「清晰度优先、同档标准编码优先」排序，默认取第一个（最高清晰度）
+const sources = computed(() =>
+  props.video.sources?.length
+    ? props.video.sources
+    : [{ url: props.video.url, label: '默认', width: 0, height: 0, filesize: 0 }]
+);
+
+const current = computed(() => sources.value[selectedIdx.value] || sources.value[0]);
+
+function sourceLabel(s) {
+  const parts = [s.label];
+  if (s.width && s.height) parts.push(`${s.width}×${s.height}`);
+  if (s.filesize) parts.push(`${(s.filesize / 1048576).toFixed(0)}MB`);
+  return parts.join(' · ');
+}
 
 // 预览/下载都走本站 /api/media 中转：服务端带微信 Referer 抓取，
 // 绕过 mpvideo CDN 对跨站直连的 403 防盗链。
 const mediaUrl = computed(() => {
-  const p = new URLSearchParams({ u: props.video.url });
+  const p = new URLSearchParams({ u: current.value.url });
   if (props.articleUrl) p.set('a', props.articleUrl);
   if (props.video.vid) p.set('v', props.video.vid);
   return `/api/media?${p.toString()}`;
@@ -50,6 +67,12 @@ async function copyLink() {
     </div>
     <div class="video-info">
       <div class="video-vid">{{ video.vid || 'mpvideo' }}</div>
+      <div v-if="sources.length > 1" class="quality-row">
+        <label class="quality-label">{{ t('qualityLabel') }}</label>
+        <select v-model.number="selectedIdx" class="quality-select">
+          <option v-for="(s, i) in sources" :key="i" :value="i">{{ sourceLabel(s) }}</option>
+        </select>
+      </div>
       <div class="video-actions">
         <button class="btn btn-small btn-ghost" @click="playing = !playing">
           {{ playing ? t('hidePreview') : t('previewBtn') }}
