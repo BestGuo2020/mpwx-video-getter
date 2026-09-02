@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { i18n } from '../i18n.js';
+import { proxyMediaUrl } from '../api.js';
 
 const props = defineProps({
   video: { type: Object, required: true },
@@ -37,9 +38,9 @@ async function copyLink() {
 <template>
   <div class="video-item">
     <div class="video-media" @click="playing = !playing">
-      <video v-if="playing" :src="mediaUrl" controls autoplay :poster="video.cover"></video>
+      <video v-if="playing" :src="mediaUrl" controls autoplay :poster="proxyMediaUrl(video.cover)"></video>
       <template v-else>
-        <img :src="video.cover" alt="" loading="lazy" />
+        <img :src="proxyMediaUrl(video.cover)" alt="" loading="lazy" />
         <span class="play-ov" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="34" height="34">
             <path d="M8 5.5v13l11-6.5z" fill="currentColor" />

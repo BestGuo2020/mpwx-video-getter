@@ -86,7 +86,8 @@ export async function onRequest(context) {
     if (v) out.set(k, v);
   }
   out.set('Accept-Ranges', 'bytes');
-  out.set('Cache-Control', 'private, max-age=3600');
+  // 图片（封面/缩略图）可长缓存，视频保持私有短缓存
+  out.set('Cache-Control', (out.get('Content-Type') || '').startsWith('image/') ? 'public, max-age=86400' : 'private, max-age=3600');
   out.set('Access-Control-Allow-Origin', '*');
   if (dl) {
     const fname = /^[A-Za-z0-9_-]{1,60}$/.test(vid) ? vid : 'wechat_video';

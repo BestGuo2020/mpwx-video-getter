@@ -154,7 +154,8 @@ async function handleMedia(req, res, url) {
     if (v) out[k] = v;
   }
   out['Accept-Ranges'] = 'bytes';
-  out['Cache-Control'] = 'private, max-age=3600';
+  // 图片（封面/缩略图）可长缓存，视频保持私有短缓存
+  out['Cache-Control'] = String(out['Content-Type'] || '').startsWith('image/') ? 'public, max-age=86400' : 'private, max-age=3600';
   out['Access-Control-Allow-Origin'] = '*';
   if (dl) {
     const fname = /^[A-Za-z0-9_-]{1,60}$/.test(vid) ? vid : 'wechat_video';

@@ -42,11 +42,18 @@ export function isArticleUrl(raw) {
   }
 }
 
-/** 校验中转媒体地址，只放行 mpvideo.qpic.cn 的 mp4，防止被当作开放代理 */
+/**
+ * 校验中转媒体地址，只放行微信系的 mp4 与图片（防止被当作开放代理）：
+ * - mpvideo.qpic.cn 的 .mp4（视频）
+ * - mmbiz.qpic.cn 的任意路径（文章封面 / 视频缩略图，可能无扩展名，如 /0?wx_fmt=jpeg）
+ */
 export function isMediaUrl(raw) {
   try {
     const u = new URL(String(raw));
-    return u.protocol === 'https:' && u.hostname === 'mpvideo.qpic.cn' && u.pathname.toLowerCase().endsWith('.mp4');
+    if (u.protocol !== 'https:') return false;
+    if (u.hostname === 'mpvideo.qpic.cn') return u.pathname.toLowerCase().endsWith('.mp4');
+    if (u.hostname === 'mmbiz.qpic.cn') return true;
+    return false;
   } catch {
     return false;
   }

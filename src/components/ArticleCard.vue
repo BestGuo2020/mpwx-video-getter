@@ -1,5 +1,6 @@
 <script setup>
 import { i18n } from '../i18n.js';
+import { proxyMediaUrl } from '../api.js';
 import VideoItem from './VideoItem.vue';
 
 defineProps({
@@ -30,7 +31,7 @@ function errText(result) {
         <img
           v-if="result.cover"
           class="article-cover"
-          :src="result.cover"
+          :src="proxyMediaUrl(result.cover)"
           alt=""
           loading="lazy"
         />
