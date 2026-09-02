@@ -100,7 +100,7 @@ pnpm build   # 同时校验双平台解析核心一致性（防漂移）
 > 两套部署共用同一份解析核心（`worker/parser.js` ↔ `edge-functions/lib/parser.js`），
 > postbuild 会强制校验两份副本一致，不一致时构建直接失败，防止双平台行为漂移。
 
-> 上线前请把 `index.html`、`robots.txt`、`sitemap.xml` 中的占位域名 `https://mpwx.bestguo.top` 替换为实际域名。
+> 站点域名：`https://mpwx-video-getter.guoguo-labs.online`（已写入 `index.html`、`robots.txt`、`sitemap.xml`，换域名时全局替换即可）。
 
 ## API 契约
 
