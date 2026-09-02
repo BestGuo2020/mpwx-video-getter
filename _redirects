@@ -1,0 +1,3 @@
+# Cloudflare Pages 回退规则（SPA）
+# /api/* 由 _worker.js 直接处理，不会落入该回退
+/*  /index.html  200
