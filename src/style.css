@@ -450,6 +450,74 @@ textarea:focus {
   margin: 0;
 }
 
+/* ---------- 使用步骤 ---------- */
+.guide {
+  margin: 10px 0 30px;
+}
+
+.guide h2 {
+  font-size: 18px;
+  margin: 0 0 14px;
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.guide-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.guide-img {
+  border-bottom: 1px solid var(--line);
+  background: #fbfcfb;
+}
+
+.guide-img img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  aspect-ratio: 4 / 3;
+}
+
+.guide-body {
+  padding: 14px 16px 16px;
+  position: relative;
+}
+
+.guide-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.guide-body h3 {
+  margin: 0 0 6px;
+  font-size: 14.5px;
+}
+
+.guide-body p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
 /* ---------- 信息区 ---------- */
 .info {
   display: grid;
@@ -490,6 +558,10 @@ textarea:focus {
 
 @media (max-width: 640px) {
   .info {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-grid {
     grid-template-columns: 1fr;
   }
 

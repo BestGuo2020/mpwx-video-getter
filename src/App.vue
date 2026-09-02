@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { i18n, setLang } from './i18n.js';
 import { parseArticles } from './api.js';
 import ArticleCard from './components/ArticleCard.vue';
+import UsageGuide from './components/UsageGuide.vue';
 
 // 示例链接（用于「填入示例」按钮；2025-07 实测含微信原生视频的公开文章）
 const EXAMPLE_URL = 'https://mp.weixin.qq.com/s/nwsNHE3f1TVVzDiP1maUfg';
@@ -117,6 +118,8 @@ const errText = computed(() => {
         <h2>{{ t('resultsTitle') }}（{{ results.length }}）</h2>
         <ArticleCard v-for="(r, idx) in results" :key="idx" :result="r" />
       </section>
+
+      <UsageGuide />
 
       <section class="info">
         <div class="info-card">
