@@ -1,5 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { NButton, NSelect, NSpace, NText, NIcon, useMessage } from 'naive-ui';
+import {
+  Play,
+  PlayOutline,
+  EyeOffOutline,
+  DownloadOutline,
+  CopyOutline,
+  CheckmarkOutline,
+  OpenOutline,
+} from '@vicons/ionicons5';
 import { i18n } from '../i18n.js';
 import { proxyMediaUrl } from '../api.js';
 
@@ -9,6 +19,8 @@ const props = defineProps({
 });
 
 const t = (key, params) => i18n.t(key, params);
+
+const message = useMessage();
 
 const playing = ref(false);
 const copied = ref(false);
@@ -30,6 +42,10 @@ function sourceLabel(s) {
   return parts.join(' · ');
 }
 
+const sourceOptions = computed(() =>
+  sources.value.map((s, i) => ({ label: sourceLabel(s), value: i }))
+);
+
 // 预览/下载都走本站 /api/media 中转：服务端带微信 Referer 抓取，
 // 绕过 mpvideo CDN 对跨站直连的 403 防盗链。
 const mediaUrl = computed(() => {
@@ -45,6 +61,7 @@ async function copyLink() {
   try {
     await navigator.clipboard.writeText(props.video.url);
     copied.value = true;
+    message.success(t('copied'));
     setTimeout(() => (copied.value = false), 1500);
   } catch {
     window.prompt(t('copyManual'), props.video.url);
@@ -55,38 +72,70 @@ async function copyLink() {
 <template>
   <div class="video-item">
     <div class="video-media" @click="playing = !playing">
-      <video v-if="playing" :src="mediaUrl" controls autoplay :poster="proxyMediaUrl(video.cover)"></video>
+      <video
+        v-if="playing"
+        :src="mediaUrl"
+        controls
+        autoplay
+        :poster="proxyMediaUrl(video.cover)"
+      ></video>
       <template v-else>
         <img :src="proxyMediaUrl(video.cover)" alt="" loading="lazy" />
         <span class="play-ov" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="34" height="34">
-            <path d="M8 5.5v13l11-6.5z" fill="currentColor" />
-          </svg>
+          <n-icon :size="36" color="#fff" :component="Play" />
         </span>
       </template>
     </div>
     <div class="video-info">
-      <div class="video-vid">{{ video.vid || 'mpvideo' }}</div>
+      <n-text depth="3" class="video-vid">{{ video.vid || 'mpvideo' }}</n-text>
       <div v-if="sources.length > 1" class="quality-row">
-        <label class="quality-label">{{ t('qualityLabel') }}</label>
-        <select v-model.number="selectedIdx" class="quality-select">
-          <option v-for="(s, i) in sources" :key="i" :value="i">{{ sourceLabel(s) }}</option>
-        </select>
+        <n-text depth="3" class="quality-label">{{ t('qualityLabel') }}</n-text>
+        <n-select
+          v-model:value="selectedIdx"
+          class="quality-select"
+          size="small"
+          :options="sourceOptions"
+          :consistent-menu-width="false"
+        />
       </div>
-      <div class="video-actions">
-        <button class="btn btn-small btn-ghost" @click="playing = !playing">
+      <n-space :size="8" wrap>
+        <n-button size="small" secondary @click="playing = !playing">
+          <template #icon>
+            <n-icon :component="playing ? EyeOffOutline : PlayOutline" />
+          </template>
           {{ playing ? t('hidePreview') : t('previewBtn') }}
-        </button>
-        <a class="btn btn-small btn-primary-soft" :href="downloadUrl" rel="noopener">
+        </n-button>
+        <n-button size="small" type="primary" tag="a" :href="downloadUrl" rel="noopener">
+          <template #icon>
+            <n-icon :component="DownloadOutline" />
+          </template>
           {{ t('downloadBtn') }}
-        </a>
-        <button class="btn btn-small btn-ghost" :class="{ copied }" @click="copyLink">
+        </n-button>
+        <n-button
+          size="small"
+          :type="copied ? 'success' : 'default'"
+          secondary
+          @click="copyLink"
+        >
+          <template #icon>
+            <n-icon :component="copied ? CheckmarkOutline : CopyOutline" />
+          </template>
           {{ copied ? t('copied') : t('copyBtn') }}
-        </button>
-        <a class="btn btn-small btn-ghost" :href="video.url" target="_blank" rel="noopener noreferrer">
+        </n-button>
+        <n-button
+          size="small"
+          secondary
+          tag="a"
+          :href="video.url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <template #icon>
+            <n-icon :component="OpenOutline" />
+          </template>
           {{ t('openBtn') }}
-        </a>
-      </div>
+        </n-button>
+      </n-space>
     </div>
   </div>
 </template>
